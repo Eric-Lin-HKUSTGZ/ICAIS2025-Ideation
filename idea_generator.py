@@ -89,13 +89,16 @@ class IdeaGenerator:
         return inspiration
 
     def generate_multi_inspirations(self, background: str, user_query: str, papers: List[Dict]) -> Dict:
-        """多源Inspiration生成 - 并行处理"""
+        """多源Inspiration生成 - 并行处理，只对top-8论文生成"""
         paper_inspirations = []
+        
+        # 只对前8篇论文生成Inspiration（论文已经按相关性排序）
+        papers_to_process = papers[:8]
         
         # 1. 为每篇论文生成Inspiration（并行）
         with ThreadPoolExecutor(max_workers=self.config.MAX_WORKERS_INSPIRATION) as executor:
             futures = []
-            for paper in papers:
+            for paper in papers_to_process:
                 future = executor.submit(
                     self.generate_paper_inspiration,
                     background, paper
@@ -252,20 +255,40 @@ class IdeaGenerator:
         """多Idea生成 - Brainstorm默认开启"""
         all_ideas = []
         
-        # 1. 基于多源Inspiration生成Idea
-        if inspirations["paper_inspirations"]:
-            ideas_from_papers = self.generate_ideas_from_inspirations(
+        # 1和2: 并行生成Idea（基于论文Inspiration和全局Inspiration）
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            futures = {}
+            
+            # 提交基于论文Inspiration的Idea生成任务
+            if inspirations["paper_inspirations"]:
+                future_papers = executor.submit(
+                    self.generate_ideas_from_inspirations,
+                    background,
+                    inspirations["paper_inspirations"]
+                )
+                futures["papers"] = future_papers
+            
+            # 提交基于全局Inspiration的Idea生成任务
+            future_global = executor.submit(
+                self.generate_idea_from_inspiration,
                 background,
-                inspirations["paper_inspirations"]
+                inspirations["global_inspiration"]
             )
-            all_ideas.extend(ideas_from_papers)
-        
-        # 2. 基于全局Inspiration生成Idea
-        ideas_from_global = self.generate_idea_from_inspiration(
-            background,
-            inspirations["global_inspiration"]
-        )
-        all_ideas.extend(ideas_from_global)
+            futures["global"] = future_global
+            
+            # 等待所有任务完成
+            if "papers" in futures:
+                try:
+                    ideas_from_papers = futures["papers"].result(timeout=120)
+                    all_ideas.extend(ideas_from_papers)
+                except Exception as e:
+                    print(f"⚠️  基于论文Inspiration生成Idea失败: {e}")
+            
+            try:
+                ideas_from_global = futures["global"].result(timeout=120)
+                all_ideas.extend(ideas_from_global)
+            except Exception as e:
+                print(f"⚠️  基于全局Inspiration生成Idea失败: {e}")
         
         # 3. 使用Brainstorm整合（默认开启）
         if self.config.ENABLE_BRAINSTORM and brainstorm:
@@ -441,28 +464,38 @@ class IdeaGenerator:
         background: str,
         refined_ideas: List[str]
     ) -> Tuple[str, Dict[str, float]]:
-        """评估并选择最优Idea"""
+        """评估并选择最优Idea - 并行评估"""
         scored_ideas = []
         
-        for idea in refined_ideas:
-            try:
-                # 检查idea是否包含多个idea，如果是则提取单个idea进行评估
+        # 并行评估所有ideas
+        with ThreadPoolExecutor(max_workers=len(refined_ideas)) as executor:
+            futures = []
+            for idea in refined_ideas:
+                # 先提取单个idea
                 single_idea = self.extract_single_idea(idea)
-                score = self.evaluate_idea(background, single_idea)
-                scored_ideas.append({
-                    "idea": single_idea,  # 使用提取后的单个idea
-                    "original_idea": idea,  # 保留原始idea用于调试
-                    "score": score
-                })
-            except Exception as e:
-                print(f"⚠️  Idea评估失败: {e}")
-                # 使用默认分数
-                single_idea = self.extract_single_idea(idea)
-                scored_ideas.append({
-                    "idea": single_idea,
-                    "original_idea": idea,
-                    "score": {"feasibility": 5.0, "novelty": 5.0, "total": 10.0}
-                })
+                future = executor.submit(
+                    self.evaluate_idea,
+                    background, single_idea
+                )
+                futures.append((future, single_idea, idea))
+            
+            # 收集评估结果
+            for future, single_idea, original_idea in futures:
+                try:
+                    score = future.result(timeout=60)  # 每个评估最多60秒
+                    scored_ideas.append({
+                        "idea": single_idea,
+                        "original_idea": original_idea,
+                        "score": score
+                    })
+                except Exception as e:
+                    print(f"⚠️  Idea评估失败: {e}")
+                    # 使用默认分数
+                    scored_ideas.append({
+                        "idea": single_idea,
+                        "original_idea": original_idea,
+                        "score": {"feasibility": 5.0, "novelty": 5.0, "total": 10.0}
+                    })
         
         # 选择总分最高的Idea
         if not scored_ideas:
@@ -556,19 +589,27 @@ class IdeaGenerator:
         """生成研究计划 - 审查默认开启"""
         paper_text = self.construct_paper_text(papers)
         
-        # 0. 生成研究计划标题
-        title = self.generate_research_plan_title(best_idea)
+        # 0和1: 并行生成标题和初步研究计划
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_title = executor.submit(self.generate_research_plan_title, best_idea)
+            future_plan = executor.submit(
+                self._generate_initial_research_plan,
+                user_query, paper_text, global_inspiration, best_idea
+            )
+            
+            # 等待两个任务完成
+            try:
+                title = future_title.result(timeout=60)
+            except Exception as e:
+                print(f"⚠️  标题生成失败: {e}，将使用默认标题")
+                title = "Research Proposal" if self.language == 'en' else "研究计划"
+            
+            try:
+                research_plan = future_plan.result(timeout=120)
+            except Exception as e:
+                print(f"⚠️  初步研究计划生成失败: {e}")
+                raise
         
-        # 1. 生成初步研究计划
-        prompt = get_prompt(
-            "generate_research_plan",
-            language=self.language,
-            user_query=user_query,
-            paper=paper_text,
-            inspiration=global_inspiration,
-            best_idea=best_idea
-        )
-        research_plan = self.llm_client.get_response(prompt=prompt)
         # 清理初步研究计划
         research_plan = self.clean_research_plan(research_plan)
         
@@ -600,5 +641,23 @@ class IdeaGenerator:
         
         # 添加标题
         return f"{title}\n\n{research_plan}"
+    
+    def _generate_initial_research_plan(
+        self,
+        user_query: str,
+        paper_text: str,
+        global_inspiration: str,
+        best_idea: str
+    ) -> str:
+        """生成初步研究计划（辅助方法，用于并行调用）"""
+        prompt = get_prompt(
+            "generate_research_plan",
+            language=self.language,
+            user_query=user_query,
+            paper=paper_text,
+            inspiration=global_inspiration,
+            best_idea=best_idea
+        )
+        return self.llm_client.get_response(prompt=prompt)
 
 

@@ -34,7 +34,7 @@ class Config(metaclass=ConfigMeta):
         elif name == "LLM_MODEL":
             return cls._get_env_with_fallback("SCI_LLM_MODEL", "LLM_MODEL", "deepseek-ai/DeepSeek-V3")
         elif name == "LLM_REQUEST_TIMEOUT":
-            return int(cls._get_env("LLM_REQUEST_TIMEOUT", "180"))
+            return int(cls._get_env("LLM_REQUEST_TIMEOUT", "120"))  # 降低到120秒
         
         # 应用配置
         elif name == "APP_ENV":
@@ -50,9 +50,9 @@ class Config(metaclass=ConfigMeta):
         
         # 论文检索配置
         elif name == "MAX_PAPERS_PER_QUERY":
-            return int(cls._get_env("MAX_PAPERS_PER_QUERY", "4"))
+            return int(cls._get_env("MAX_PAPERS_PER_QUERY", "3"))  # 减少到3
         elif name == "MAX_TOTAL_PAPERS":
-            return int(cls._get_env("MAX_TOTAL_PAPERS", "12"))
+            return int(cls._get_env("MAX_TOTAL_PAPERS", "10"))  # 减少到10
         elif name == "SEMANTIC_SCHOLAR_TIMEOUT":
             return int(cls._get_env("SEMANTIC_SCHOLAR_TIMEOUT", "30"))  # 增加到30秒
         elif name == "SEMANTIC_SCHOLAR_MAX_RETRIES":
