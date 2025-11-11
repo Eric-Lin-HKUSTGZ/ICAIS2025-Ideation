@@ -445,13 +445,77 @@ class IdeaGenerator:
         prompt = get_prompt("evaluate_idea", language=self.language, background=background, idea=idea)
         response = self.llm_client.get_response(prompt=prompt)
         
-        # 解析分数
-        feasibility_match = re.search(r'Feasibility:\s*(\d+(?:\.\d+)?)', response)
-        novelty_match = re.search(r'Novelty:\s*(\d+(?:\.\d+)?)', response)
+        # 调试：输出原始响应（仅前500字符）
+        debug_response = response[:500] if len(response) > 500 else response
+        print(f"🔍 评估响应（前500字符）: {debug_response}")
         
-        feasibility = float(feasibility_match.group(1)) if feasibility_match else 5.0
-        novelty = float(novelty_match.group(1)) if novelty_match else 5.0
-        total = feasibility + novelty
+        # 改进的正则表达式，支持多种格式：
+        # - Feasibility: 4.2/5
+        # - Feasibility: 4.2
+        # - Feasibility: 4.2 out of 5
+        # - Feasibility: 4.20
+        # 支持中英文
+        feasibility_patterns = [
+            r'Feasibility[：:]\s*(\d+\.?\d*)',  # 中文冒号和英文冒号
+            r'可行性[：:]\s*(\d+\.?\d*)',
+            r'Feasibility[：:]\s*(\d+\.?\d*)\s*/?\s*5',  # 带/5
+            r'可行性[：:]\s*(\d+\.?\d*)\s*/?\s*5',
+        ]
+        
+        novelty_patterns = [
+            r'Novelty[：:]\s*(\d+\.?\d*)',
+            r'创新性[：:]\s*(\d+\.?\d*)',
+            r'Novelty[：:]\s*(\d+\.?\d*)\s*/?\s*5',
+            r'创新性[：:]\s*(\d+\.?\d*)\s*/?\s*5',
+        ]
+        
+        feasibility = None
+        novelty = None
+        
+        # 尝试匹配可行性分数
+        for pattern in feasibility_patterns:
+            match = re.search(pattern, response, re.IGNORECASE)
+            if match:
+                try:
+                    feasibility = float(match.group(1))
+                    # 如果分数大于5，可能是误匹配，跳过
+                    if feasibility > 5.0:
+                        continue
+                    break
+                except ValueError:
+                    continue
+        
+        # 尝试匹配创新性分数
+        for pattern in novelty_patterns:
+            match = re.search(pattern, response, re.IGNORECASE)
+            if match:
+                try:
+                    novelty = float(match.group(1))
+                    # 如果分数大于5，可能是误匹配，跳过
+                    if novelty > 5.0:
+                        continue
+                    break
+                except ValueError:
+                    continue
+        
+        # 如果解析失败，使用默认值并输出警告
+        if feasibility is None:
+            print(f"⚠️  无法解析可行性分数，使用默认值5.0")
+            feasibility = 5.0
+        if novelty is None:
+            print(f"⚠️  无法解析创新性分数，使用默认值5.0")
+            novelty = 5.0
+        
+        # 确保分数在0-5范围内
+        feasibility = max(0.0, min(5.0, feasibility))
+        novelty = max(0.0, min(5.0, novelty))
+        
+        # 保留一位小数
+        feasibility = round(feasibility, 1)
+        novelty = round(novelty, 1)
+        total = round(feasibility + novelty, 1)
+        
+        print(f"📊 解析结果: 可行性={feasibility}, 创新性={novelty}, 总分={total}")
         
         return {
             "feasibility": feasibility,

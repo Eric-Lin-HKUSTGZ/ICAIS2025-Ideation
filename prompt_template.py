@@ -178,10 +178,21 @@ Please provide scores (0-5) for:
 1. Feasibility: How practical and implementable is this idea?
 2. Novelty: How innovative and original is this idea?
 
+IMPORTANT SCORING REQUIREMENTS:
+- Scores must be precise to one decimal place (e.g., 4.2, 3.7, 4.8, not 4, 3, or 5)
+- Use the full range of 0.0 to 5.0 to distinguish between different ideas
+- Be precise and differentiate: similar ideas should have slightly different scores
+- Avoid giving the same score to different ideas
+
 Format your response as:
-Feasibility: [score]/5
-Novelty: [score]/5
-Total: [total_score]/10
+Feasibility: [score with one decimal place]/5
+Novelty: [score with one decimal place]/5
+Total: [total_score with one decimal place]/10
+
+Example format:
+Feasibility: 4.2/5
+Novelty: 4.5/5
+Total: 8.7/10
 
 Brief justification:
 [Brief explanation of the scores]
