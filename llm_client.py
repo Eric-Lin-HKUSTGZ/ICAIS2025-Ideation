@@ -88,16 +88,27 @@ class LLMClient:
                 else:
                     raise Exception(f"API调用失败: {e}")
 
-    def get_response(self, prompt: str, **kwargs) -> str:
-        """获取LLM响应"""
+    def get_response(self, prompt: str, use_reasoning_model: bool = False, **kwargs) -> str:
+        """获取LLM响应
+        
+        Args:
+            prompt: 提示词
+            use_reasoning_model: 是否使用推理模型，如果为True则使用Config.LLM_REASONING_MODEL
+            **kwargs: 其他参数（temperature, max_retries等）
+        """
         temperature = kwargs.get('temperature', self.temperature)
         max_retries = kwargs.get('max_retries', self.max_retries)
 
         # 临时更新参数
         original_temp = self.temperature
         original_retries = self.max_retries
+        original_llm = self.llm
         self.temperature = temperature
         self.max_retries = max_retries
+        
+        # 如果使用推理模型，临时替换模型名称
+        if use_reasoning_model:
+            self.llm = self.config.LLM_REASONING_MODEL
 
         try:
             return self._make_api_call(prompt)
@@ -105,6 +116,7 @@ class LLMClient:
             # 恢复原始参数
             self.temperature = original_temp
             self.max_retries = original_retries
+            self.llm = original_llm
 
     def validate_config(self) -> bool:
         """验证配置是否正确"""

@@ -53,7 +53,8 @@ def main():
         return
     
     # 用户查询
-    user_query = "我想做一个遥感图像场景分类的研究。"
+    user_query = "我想做一个大模型压缩加速的研究。"
+    # user_query = "I want to do a research on remote sensing image scene classification."
     print(f"\n📝 用户查询: {user_query}")
     
     # 检测用户输入的语言
@@ -107,7 +108,7 @@ def main():
         print("\n🎯 步骤6: 生成多个Idea...")
         step_start = time.time()
         initial_ideas = generator.generate_ideas(
-            expanded_background, inspirations, brainstorm
+            expanded_background, inspirations, brainstorm, user_query
         )
         print(f"生成了 {len(initial_ideas)} 个Idea")
         print(f"初始Idea: {initial_ideas}")
@@ -133,6 +134,11 @@ def main():
         best_idea, score = generator.evaluate_and_select_best_idea(
             expanded_background, refined_ideas
         )
+        print("\n" + "-" * 80)
+        print("📌 最优Idea:")
+        print("-" * 80)
+        print(best_idea)
+        print("\n" + "-" * 80)
         print(f"最优Idea得分: 可行性={score['feasibility']:.2f}, 创新性={score['novelty']:.2f}, 总分={score['total']:.2f}")
         print(f"⏱️  耗时: {time.time() - step_start:.2f}秒")
         
@@ -151,10 +157,6 @@ def main():
         print("=" * 80)
         print(f"\n⏱️  总耗时: {total_time:.2f}秒 ({total_time/60:.2f}分钟)")
         
-        print("\n" + "-" * 80)
-        print("📌 最优Idea:")
-        print("-" * 80)
-        print(best_idea)
         
         print("\n" + "-" * 80)
         print("📄 研究计划:")

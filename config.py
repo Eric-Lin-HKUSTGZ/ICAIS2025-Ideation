@@ -33,6 +33,11 @@ class Config(metaclass=ConfigMeta):
             return cls._get_env_with_fallback("SCI_MODEL_API_KEY", "LLM_API_KEY")
         elif name == "LLM_MODEL":
             return cls._get_env_with_fallback("SCI_LLM_MODEL", "LLM_MODEL", "deepseek-ai/DeepSeek-V3")
+        elif name == "LLM_REASONING_MODEL":
+            reasoning_model = cls._get_env("SCI_LLM_REASONING_MODEL")
+            if not reasoning_model:
+                raise ValueError("SCI_LLM_REASONING_MODEL环境变量未设置，请配置推理模型")
+            return reasoning_model
         elif name == "LLM_REQUEST_TIMEOUT":
             return int(cls._get_env("LLM_REQUEST_TIMEOUT", "120"))  # 降低到120秒
         
@@ -104,7 +109,27 @@ class Config(metaclass=ConfigMeta):
         print(f"环境: {cls.APP_ENV}")
         print(f"调试模式: {cls.DEBUG}")
         print(f"LLM端点: {cls.LLM_API_ENDPOINT}")
-        print(f"LLM模型: {cls.LLM_MODEL}")
+        
+        # 检查推理模型是否配置
+        reasoning_model_configured = False
+        try:
+            reasoning_model = cls.LLM_REASONING_MODEL
+            reasoning_model_configured = True
+        except (ValueError, AttributeError):
+            pass
+        
+        # 根据实际使用情况显示模型信息
+        # 普通模型用于：关键词提取、背景扩展
+        # 推理模型用于：Brainstorm、Inspiration生成、Idea生成/优化/评估、研究计划生成
+        if reasoning_model_configured:
+            # 两个模型都会被使用，都显示
+            print(f"普通模型 (用于简单任务): {cls.LLM_MODEL}")
+            print(f"推理模型 (用于深度推理任务): {reasoning_model}")
+        else:
+            # 只显示普通模型（推理模型未配置，深度推理任务会失败）
+            print(f"LLM模型: {cls.LLM_MODEL}")
+            print("⚠️  推理模型未配置，深度推理任务将无法执行")
+        
         print(f"请求超时: {cls.LLM_REQUEST_TIMEOUT}秒")
         print(f"默认温度: {cls.DEFAULT_TEMPERATURE}")
         print(f"最大重试: {cls.MAX_RETRIES}")

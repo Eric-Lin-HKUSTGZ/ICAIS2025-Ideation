@@ -69,7 +69,7 @@ class IdeaGenerator:
                 title=title,
                 abstract=abstract
             )
-            inspiration = self.llm_client.get_response(prompt=prompt)
+            inspiration = self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
             return inspiration
         except Exception as e:
             print(f"⚠️  生成论文Inspiration失败: {e}")
@@ -85,7 +85,7 @@ class IdeaGenerator:
             paper_text += f"Paper {i}:\nTitle: {title}\nAbstract: {abstract}\n\n"
         
         prompt = get_prompt("generate_global_inspiration", language=self.language, user_query=user_query, paper=paper_text)
-        inspiration = self.llm_client.get_response(prompt=prompt)
+        inspiration = self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
         return inspiration
 
     def generate_multi_inspirations(self, background: str, user_query: str, papers: List[Dict]) -> Dict:
@@ -213,25 +213,25 @@ class IdeaGenerator:
         # 如果都找不到，返回原始文本
         return idea_text
 
-    def generate_ideas_from_inspirations(self, background: str, inspirations: List[str]) -> List[str]:
+    def generate_ideas_from_inspirations(self, background: str, inspirations: List[str], user_query: str) -> List[str]:
         """基于多源Inspiration生成Idea"""
         inspirations_text = "\n\n".join([
             f"Inspiration {i+1}:\n{insp}" for i, insp in enumerate(inspirations)
         ])
         
-        prompt = get_prompt("generate_ideas_from_inspirations", language=self.language, background=background, inspirations=inspirations_text)
+        prompt = get_prompt("generate_ideas_from_inspirations", language=self.language, background=background, inspirations=inspirations_text, user_query=user_query)
         response = self.llm_client.get_response(prompt=prompt)
         ideas = self.extract_ideas(response)
         return ideas[:self.config.MAX_IDEAS_GENERATE]
 
-    def generate_idea_from_inspiration(self, background: str, inspiration: str) -> List[str]:
+    def generate_idea_from_inspiration(self, background: str, inspiration: str, user_query: str) -> List[str]:
         """基于单个Inspiration生成Idea"""
-        prompt = get_prompt("generate_idea_from_inspiration", language=self.language, background=background, inspiration=inspiration)
+        prompt = get_prompt("generate_idea_from_inspiration", language=self.language, background=background, inspiration=inspiration, user_query=user_query)
         response = self.llm_client.get_response(prompt=prompt)
         ideas = self.extract_ideas(response)
         return ideas[:3]  # 最多3个
 
-    def integrate_with_brainstorm(self, background: str, brainstorm: str, ideas: List[str]) -> List[str]:
+    def integrate_with_brainstorm(self, background: str, brainstorm: str, ideas: List[str], user_query: str) -> List[str]:
         """使用Brainstorm整合Idea - 默认开启"""
         ideas_text = "\n\n".join(ideas)
         
@@ -240,7 +240,8 @@ class IdeaGenerator:
             language=self.language,
             background=background,
             brainstorm=brainstorm,
-            ideas=ideas_text
+            ideas=ideas_text,
+            user_query=user_query
         )
         response = self.llm_client.get_response(prompt=prompt)
         integrated_ideas = self.extract_ideas(response)
@@ -250,7 +251,8 @@ class IdeaGenerator:
         self,
         background: str,
         inspirations: Dict,
-        brainstorm: str
+        brainstorm: str,
+        user_query: str
     ) -> List[str]:
         """多Idea生成 - Brainstorm默认开启"""
         all_ideas = []
@@ -264,7 +266,8 @@ class IdeaGenerator:
                 future_papers = executor.submit(
                     self.generate_ideas_from_inspirations,
                     background,
-                    inspirations["paper_inspirations"]
+                    inspirations["paper_inspirations"],
+                    user_query
                 )
                 futures["papers"] = future_papers
             
@@ -272,7 +275,8 @@ class IdeaGenerator:
             future_global = executor.submit(
                 self.generate_idea_from_inspiration,
                 background,
-                inspirations["global_inspiration"]
+                inspirations["global_inspiration"],
+                user_query
             )
             futures["global"] = future_global
             
@@ -292,7 +296,7 @@ class IdeaGenerator:
         
         # 3. 使用Brainstorm整合（默认开启）
         if self.config.ENABLE_BRAINSTORM and brainstorm:
-            all_ideas = self.integrate_with_brainstorm(background, brainstorm, all_ideas)
+            all_ideas = self.integrate_with_brainstorm(background, brainstorm, all_ideas, user_query)
         
         return all_ideas[:self.config.MAX_IDEAS_GENERATE]
 
@@ -305,7 +309,7 @@ class IdeaGenerator:
         ])
         
         prompt = get_prompt("critic_idea", language=self.language, background=background, papers_summary=papers_summary, idea=idea)
-        criticism = self.llm_client.get_response(prompt=prompt)
+        criticism = self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
         
         # 检查返回值
         if not criticism or not isinstance(criticism, str):
@@ -319,7 +323,7 @@ class IdeaGenerator:
             raise ValueError("criticism不能为空")
         
         prompt = get_prompt("refine_idea", language=self.language, background=background, idea=idea, criticism=criticism)
-        refined = self.llm_client.get_response(prompt=prompt)
+        refined = self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
         
         # 检查返回值
         if not refined or not isinstance(refined, str):
@@ -443,7 +447,7 @@ class IdeaGenerator:
     def evaluate_idea(self, background: str, idea: str) -> Dict[str, float]:
         """评估Idea的可行性和创新性"""
         prompt = get_prompt("evaluate_idea", language=self.language, background=background, idea=idea)
-        response = self.llm_client.get_response(prompt=prompt)
+        response = self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
         
         # 调试：输出原始响应（仅前500字符）
         debug_response = response[:500] if len(response) > 500 else response
@@ -593,6 +597,11 @@ class IdeaGenerator:
             r'^(Let me|I will|I would like to|I should|I need to)[^.]*\.\s*',
             # 移除结尾的元语言
             r'\s*(I hope|I believe|I think|I trust|I am confident)[^.]*\.\s*$',
+            # 移除包含"总耗时"、"最终结果"等无关信息的行
+            r'.*总耗时.*\n?',
+            r'.*最终结果.*\n?',
+            r'.*🎉.*\n?',
+            r'.*⏱️.*总耗时.*\n?',
         ]
         
         cleaned = research_plan
@@ -624,14 +633,19 @@ class IdeaGenerator:
         return cleaned.strip()
 
     def generate_research_plan_title(self, best_idea: str) -> str:
-        """生成研究计划标题"""
-        prompt = get_prompt("generate_research_plan_title", language=self.language, best_idea=best_idea)
-        title = self.llm_client.get_response(prompt=prompt)
-        # 清理标题，移除可能的引号、换行等
+        """生成研究计划标题 - 直接使用最优idea的名字"""
+        # 直接使用best_idea作为标题，清理格式
+        title = best_idea.strip()
+        # 移除可能的markdown格式标记
+        title = re.sub(r'\*\*', '', title)  # 移除 **
+        title = re.sub(r'^#+\s*', '', title)  # 移除开头的 # 标记
+        # 移除可能的引号
         title = title.strip().strip('"').strip("'").strip()
-        # 如果标题包含换行，只取第一行
+        # 如果包含换行，只取第一行
         if '\n' in title:
             title = title.split('\n')[0].strip()
+        # 移除可能的"Idea 1:"等前缀
+        title = re.sub(r'^Idea\s+\d+[：:]\s*', '', title, flags=re.IGNORECASE)
         return title
 
     def construct_paper_text(self, papers: List[Dict]) -> str:
@@ -687,7 +701,7 @@ class IdeaGenerator:
                 inspiration=global_inspiration,
                 research_plan=research_plan
             )
-            criticism = self.llm_client.get_response(prompt=prompt_critic)
+            criticism = self.llm_client.get_response(prompt=prompt_critic, use_reasoning_model=False)
             
             # 3. 完善研究计划
             prompt_refine = get_prompt(
@@ -697,7 +711,7 @@ class IdeaGenerator:
                 research_plan=research_plan,
                 criticism=criticism
             )
-            final_plan = self.llm_client.get_response(prompt=prompt_refine)
+            final_plan = self.llm_client.get_response(prompt=prompt_refine, use_reasoning_model=False)
             # 清理最终研究计划
             final_plan = self.clean_research_plan(final_plan)
             # 添加标题
@@ -722,6 +736,6 @@ class IdeaGenerator:
             inspiration=global_inspiration,
             best_idea=best_idea
         )
-        return self.llm_client.get_response(prompt=prompt)
+        return self.llm_client.get_response(prompt=prompt, use_reasoning_model=False)
 
 

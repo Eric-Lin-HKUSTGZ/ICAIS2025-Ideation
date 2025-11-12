@@ -21,11 +21,13 @@ Task: Expand the following brief research query into a comprehensive research ba
 Brief Query: {brief_background}
 Keywords: {keywords}
 
-Please provide a detailed research background (200-500 words) that:
+Please provide a detailed research background (200-500 words) in Markdown format that:
 1. Explains the research problem clearly
 2. Provides context and motivation
 3. Describes the importance of the research area
 4. Uses clear and accessible language
+
+Output your response in Markdown format.
 
 Research Background:
 """,
@@ -44,7 +46,7 @@ Your brainstorming should be systematic:
 - **Step 2**: Generate a list of 3 to 4 high-level ideas or directions that could potentially solve problems in the given background. Be creative, think outside the box, and avoid merely rephrasing existing methods.
 
 ### Format for Your Response:
-Please present 3 to 4 ideas in the following format:
+Output your response in Markdown format. Please present 3 to 4 ideas in the following format:
 **Idea 1**: [Brief description of the first idea]
 **Idea 2**: [Brief description of the second idea]
 **Idea 3**: [Brief description of the third idea]
@@ -61,10 +63,12 @@ Paper Information:
 Title: {title}
 Abstract: {abstract}
 
-Please generate a concise research inspiration (2-3 sentences) that:
+Please generate a concise research inspiration (2-3 sentences) in Markdown format that:
 1. Identifies a novel insight or opportunity from this paper
 2. Connects it to the research background
 3. Suggests a potential research direction
+
+Output your response in Markdown format.
 
 Inspiration:
 """,
@@ -77,16 +81,25 @@ User Query: {user_query}
 Related Papers: {paper}
 
 Please synthesize these papers holistically—without analyzing each one individually—and propose one novel research inspiration that directly addresses the user's query. The inspiration should emerge from a deep understanding of the underlying assumptions, gaps, or unexplored opportunities in the existing literature, not merely by combining existing methods. Prioritize conceptual insight and originality over technical aggregation, and ensure the proposal is both innovative and closely aligned with the user's needs. Focus on delivering a concise, imaginative spark rooted in genuine scholarly insight.
+
+Output your response in Markdown format.
 """,
     
     "generate_ideas_from_inspirations": """You are an experienced AI researcher. Based on multiple research inspirations, generate innovative research ideas.
 
+User Query: {user_query}
 Research Background: {background}
 
 Inspirations:
 {inspirations}
 
-Please generate exactly 3 research ideas based on these inspirations. Each idea should be innovative and address the research background.
+IMPORTANT REQUIREMENTS:
+- The generated ideas MUST be highly relevant to the user's query and application scenario
+- Each idea should directly address the specific problem or domain mentioned in the user query
+- The application scenario of each idea must align with the user's research interest
+- Do NOT generate generic ideas that could apply to any field - they must be tailored to the user's specific query
+
+Please generate exactly 3 research ideas based on these inspirations. Each idea should be innovative, address the research background, and be highly relevant to the user's query.
 
 Format your response as:
 **Idea 1**: [Description of the first idea]
@@ -96,11 +109,18 @@ Format your response as:
     
     "generate_idea_from_inspiration": """You are an experienced AI researcher. Based on a research inspiration, generate innovative research ideas.
 
+User Query: {user_query}
 Research Background: {background}
 
 Inspiration: {inspiration}
 
-Please generate 2-3 research ideas based on this inspiration. Each idea should be innovative and address the research background.
+IMPORTANT REQUIREMENTS:
+- The generated ideas MUST be highly relevant to the user's query and application scenario
+- Each idea should directly address the specific problem or domain mentioned in the user query
+- The application scenario of each idea must align with the user's research interest
+- Do NOT generate generic ideas that could apply to any field - they must be tailored to the user's specific query
+
+Please generate 2-3 research ideas based on this inspiration. Each idea should be innovative, address the research background, and be highly relevant to the user's query.
 
 Format your response as:
 **Idea 1**: [Description of the first idea]
@@ -114,19 +134,28 @@ Task Description:
 You will be provided with research background information along with a set of ideas you generated previously from the related paper information, and a set of brainstorming ideas concerning the same research topic. Your task is to combine these ideas and generate new ones, the new ideas you generate should base on the ideas you generated previously, and integrate creative parts of the brainstorming ideas. Consider the background thoroughly, taking into account the novelty and practicability of each idea. If you think an idea you generate is reasonable and valuable, feel free to retain it. 
 
 ### Information Provided:
-1. **Research Background**: The starting point for idea generation based on the research context.
-2. **Brainstorming Ideas**: These ideas were generated purely from the research background, focusing on innovation and may not be directly related to the problem.
-3. **Generated Ideas**: These are the ideas you previously generated by considering both the research background and related papers.
+1. **User Query**: The user's specific research interest and application scenario.
+2. **Research Background**: The starting point for idea generation based on the research context.
+3. **Brainstorming Ideas**: These ideas were generated purely from the research background, focusing on innovation and may not be directly related to the problem.
+4. **Generated Ideas**: These are the ideas you previously generated by considering both the research background and related papers.
 
 ### Approach:
-- **Step 1**: Review the research background and original ideas to understand the foundation of the problem.
-- **Step 2**: Consider the brainstorming ideas and original ideas together. Combine, improve, or expand upon them, integrating insights from the related papers.
-- **Step 3**: Propose new ideas that are innovative and practical, ensuring they align with the research background.
+- **Step 1**: Review the user query to understand the specific application scenario and research interest.
+- **Step 2**: Review the research background and original ideas to understand the foundation of the problem.
+- **Step 3**: Consider the brainstorming ideas and original ideas together. Combine, improve, or expand upon them, integrating insights from the related papers.
+- **Step 4**: Propose new ideas that are innovative and practical, ensuring they align with the research background AND are highly relevant to the user's query and application scenario.
+
+IMPORTANT REQUIREMENTS:
+- The final integrated ideas MUST be highly relevant to the user's query and application scenario
+- Each idea should directly address the specific problem or domain mentioned in the user query
+- The application scenario of each idea must align with the user's research interest
+- Do NOT generate generic ideas that could apply to any field - they must be tailored to the user's specific query
 
 ### Specific Information:
-1. **Research Background**: {background}
-2. **Brainstorming Ideas**: {brainstorm}
-3. **Generated Ideas**: {ideas}
+1. **User Query**: {user_query}
+2. **Research Background**: {background}
+3. **Brainstorming Ideas**: {brainstorm}
+4. **Generated Ideas**: {ideas}
 
 ### Format for Your Response:
 Please ensure that your final ideas include exactly 3 entries and present the integrated ideas in the following format:
@@ -207,16 +236,25 @@ Related Papers: {paper}
 Inspiration: {inspiration}
 Best Idea: {best_idea}
 
+CRITICAL REQUIREMENT - BEST IDEA ALIGNMENT:
+- The research proposal MUST be strictly based on the provided "Best Idea"
+- The proposal title, methodology, and all technical details MUST align with the Best Idea
+- Do NOT deviate from, modify, or replace the Best Idea with a different approach
+- The Best Idea is the core of the research proposal - all sections must support and elaborate on this specific idea
+- If the Best Idea mentions specific techniques, methods, or frameworks, the proposal must detail how these will be implemented
+
 Based on this information, please draft a complete research proposal that fulfills the following requirements:
 
 1. The proposal must be grounded in the provided research inspiration and best idea—do not deviate from or replace them.
-2. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
-3. If no specific structure is given, organize the proposal into the following three sections:
+2. The proposal MUST strictly follow and elaborate on the Best Idea provided above.
+3. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
+4. If no specific structure is given, organize the proposal into the following three sections:
    • Research Background – contextualize the problem and summarize key findings from the related literature,
    • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches, and
-   • Proposed Research Plan – detail the novel idea, methodology, and how it addresses the user's query and overcomes prior limitations.
+   • Proposed Research Plan – detail the novel idea (the Best Idea), methodology, and how it addresses the user's query and overcomes prior limitations.
 
 IMPORTANT OUTPUT FORMAT REQUIREMENTS:
+- Output your response in Markdown format.
 - Start directly with the research proposal content. Do NOT include any introductory phrases such as "Of course", "Certainly", "I have thoroughly revised", "Based on", "According to", etc.
 - Do NOT include any meta-commentary about the writing process (e.g., "I have revised", "I will now", "Let me").
 - Output ONLY the research proposal content itself, beginning with the first section title.
@@ -244,14 +282,22 @@ User Query: {user_query}
 Preliminary Research Proposal: {research_plan}
 Critical evaluation of the proposal and clear revision suggestion: {criticism}
 
+CRITICAL REQUIREMENT - BEST IDEA CONSISTENCY:
+- The revised research proposal MUST maintain consistency with the Best Idea that was used to generate the preliminary proposal
+- Do NOT change the core idea, methodology, or approach described in the Best Idea
+- The revision should only improve clarity, address weaknesses, and enhance details while keeping the Best Idea intact
+- If the Best Idea mentions specific techniques, methods, or frameworks, these must remain in the revised proposal
+
 Please revise the research proposal thoroughly in light of the feedback, ensuring that the updated version fully aligns with both the original user query and the stated revision requirements. The revised proposal should clearly address the identified issues—such as lack of novelty, insufficient methodological detail, or misalignment with the user's goals—while maintaining coherence, rigor, and scientific plausibility. The refined proposal should fulfills the following requirements:
-1. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
-2. If no specific structure is given, organize the proposal into the following three sections:
+1. The proposal MUST remain consistent with the Best Idea used in the preliminary proposal.
+2. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
+3. If no specific structure is given, organize the proposal into the following three sections:
    • Research Background – contextualize the problem and summarize key findings from the related literature,
    • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches, and
    • Proposed Research Plan – detail the novel idea, methodology, and how it addresses the user's query and overcomes prior limitations.
 
 IMPORTANT OUTPUT FORMAT REQUIREMENTS:
+- Output your response in Markdown format.
 - Start directly with the revised research proposal content. Do NOT include any introductory phrases such as "Of course", "Certainly", "I have thoroughly revised", "I have revised", "Based on", "According to", etc.
 - Do NOT include any meta-commentary about the revision process (e.g., "I have revised", "I will now", "Let me", "I have addressed").
 - Output ONLY the revised research proposal content itself, beginning with the first section title.

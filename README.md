@@ -18,7 +18,8 @@
 
 ```
 ICAIS2025-Ideation/
-├── main.py                    # 主程序入口
+├── main.py                    # 主程序入口（命令行方式）
+├── api_service.py             # API服务（FastAPI，支持SSE流式输出）
 ├── config.py                  # 配置管理（支持环境变量延迟加载）
 ├── llm_client.py              # LLM客户端（支持自定义API端点）
 ├── embedding_client.py        # Embedding客户端（API调用）
@@ -88,6 +89,8 @@ ENABLE_PLAN_REVIEW=True      # 研究计划审查（默认开启）
 
 ## 使用方法
 
+### 命令行方式
+
 ```bash
 # 1. 配置环境变量（创建.env文件）
 # 2. 运行主程序
@@ -99,6 +102,122 @@ python main.py
 2. 根据语言自动切换所有输出
 3. 执行完整的idea生成流程
 4. 输出最优Idea和完整研究计划
+
+### API服务方式
+
+系统提供了基于FastAPI的RESTful API服务，支持SSE（Server-Sent Events）流式输出。
+
+#### 启动API服务
+
+```bash
+# 方式1：直接运行
+python api_service.py
+
+# 方式2：使用uvicorn
+uvicorn api_service:app --host 0.0.0.0 --port 3000
+```
+
+默认服务地址：`http://0.0.0.0:3000`
+
+#### API端点
+
+**1. POST /ideation** - 生成研究Idea（SSE流式输出）
+
+**请求格式**：
+```json
+{
+  "query": "Please help me come up with an innovative idea for spatiotemporal data prediction using LLM technology."
+}
+```
+
+**响应格式**：SSE流式输出，每个数据块为JSON格式：
+```json
+{
+  "type": "step|step_result|final|error|info|start",
+  "step": 1,  // 可选，步骤编号
+  "message": "## 步骤1: 提取关键词\n\n"  // Markdown格式的消息内容
+}
+```
+
+**消息类型说明**：
+- `start`: 开始生成
+- `info`: 信息提示（如初始化成功、语言检测等）
+- `step`: 步骤开始
+- `step_result`: 步骤结果
+- `final`: 最终结果（研究计划）
+- `error`: 错误信息
+
+**使用示例**：
+
+```bash
+# 使用curl请求API
+curl -X POST http://localhost:3000/ideation \
+  -H "Content-Type: application/json" \
+  -d '{"query": "我想做一个遥感图像场景分类的研究。"}' \
+  --no-buffer
+```
+
+**Python客户端示例**：
+
+```python
+import requests
+import json
+
+url = "http://localhost:3000/ideation"
+data = {
+    "query": "Please help me come up with an innovative idea for spatiotemporal data prediction using LLM technology."
+}
+
+response = requests.post(url, json=data, stream=True)
+
+for line in response.iter_lines():
+    if line:
+        line_str = line.decode('utf-8')
+        if line_str.startswith('data: '):
+            data_str = line_str[6:]  # 移除 'data: ' 前缀
+            try:
+                event_data = json.loads(data_str)
+                print(event_data['message'], end='')
+            except json.JSONDecodeError:
+                pass
+```
+
+**2. GET /health** - 健康检查
+
+```bash
+curl http://localhost:3000/health
+```
+
+响应：
+```json
+{
+  "status": "ok",
+  "service": "ICAIS2025-Ideation API"
+}
+```
+
+**3. GET /** - 根端点
+
+返回API服务信息和可用端点列表。
+
+**4. GET /docs** - API文档
+
+FastAPI自动生成的交互式API文档，访问 `http://localhost:3000/docs` 查看。
+
+#### API特性
+
+- ✅ **实时流式输出**：使用SSE技术，每个步骤完成后立即返回结果
+- ✅ **Markdown格式**：所有输出均为Markdown格式，便于前端渲染
+- ✅ **异步处理**：使用异步框架，支持高并发请求
+- ✅ **错误处理**：完善的错误处理和异常捕获机制
+- ✅ **CORS支持**：默认允许跨域请求
+
+#### 注意事项
+
+1. **流式输出**：客户端需要支持SSE（Server-Sent Events）或使用流式HTTP请求
+2. **超时设置**：整个流程可能需要5-10分钟，请确保客户端超时设置足够长
+3. **并发限制**：建议根据服务器资源限制并发请求数量
+4. **端口配置**：默认端口3000，可在`api_service.py`中修改
 
 ## 完整流程
 
@@ -175,6 +294,8 @@ python main.py
 
 ## 技术栈
 
+- **API框架**：FastAPI（用于API服务）
+- **流式输出**：SSE (Server-Sent Events)
 - **论文检索**：Semantic Scholar API
 - **LLM服务**：支持自定义API端点（兼容OpenAI格式）
 - **Embedding模型**：支持API调用（默认：Qwen/Qwen3-Embedding-4B）
