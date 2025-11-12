@@ -155,8 +155,44 @@ class PaperRetriever:
         for attempt in range(max_retries):
             try:
                 response = requests.get(url, params=params, timeout=self.config.SEMANTIC_SCHOLAR_TIMEOUT)
-                data = response.json()
+                
+                # 检查 HTTP 状态码
+                if response.status_code != 200:
+                    error_msg = f"HTTP {response.status_code}"
+                    try:
+                        error_data = response.json()
+                        if 'error' in error_data:
+                            error_msg += f": {error_data['error']}"
+                        elif 'message' in error_data:
+                            error_msg += f": {error_data['message']}"
+                    except:
+                        error_msg += f": {response.text[:100]}"
+                    
+                    if attempt < max_retries - 1:
+                        wait_time = min(2 ** attempt, 5)
+                        print(f"获取相关论文失败 ({error_msg})，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"获取相关论文最终失败: {error_msg}")
+                        return []
+                
+                # 解析 JSON 响应
+                try:
+                    data = response.json()
+                except ValueError as e:
+                    if attempt < max_retries - 1:
+                        wait_time = min(2 ** attempt, 5)
+                        print(f"获取相关论文响应JSON解析失败: {e}，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+                        print(f"响应内容: {response.text[:200]}")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        print(f"获取相关论文最终失败: JSON解析错误 - {e}")
+                        print(f"响应内容: {response.text[:500]}")
+                        return []
 
+                # 检查响应格式
                 if 'data' in data:
                     papers = data['data'][:max_results] if data['data'] else []
                     if papers:
@@ -168,10 +204,18 @@ class PaperRetriever:
                         time.sleep(wait_time)
                     continue
                 else:
-                    # 响应中没有'data'字段，继续重试
+                    # 响应中没有'data'字段，检查是否有错误信息
+                    error_info = ""
+                    if 'error' in data:
+                        error_info = f"错误: {data['error']}"
+                    elif 'message' in data:
+                        error_info = f"消息: {data['message']}"
+                    else:
+                        error_info = f"响应格式: {list(data.keys())[:5]}"
+                    
                     if attempt < max_retries - 1:
                         wait_time = min(2 ** attempt, 5)
-                        print(f"获取相关论文响应格式异常，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_retries})")
+                        print(f"获取相关论文响应格式异常 ({error_info})，{wait_time}秒后重试... (尝试 {attempt + 1}/{max_retries})")
                         time.sleep(wait_time)
                     continue
             except requests.exceptions.Timeout:
