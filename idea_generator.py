@@ -169,20 +169,35 @@ class IdeaGenerator:
         # 调试日志
         if len(ideas) > 1:
             print(f"✅ 成功提取 {len(ideas)} 个Idea")
-        elif len(ideas) == 1 and 'Idea' in ideas[0] and ('Idea 1' in ideas[0] or 'Idea 2' in ideas[0]):
-            # 如果只有一个idea但包含多个idea标记，尝试进一步分割
-            print(f"⚠️  检测到单个文本包含多个Idea标记，尝试进一步分割...")
-            # 使用更精确的模式重新提取
-            refined_pattern = r'\*\*Idea\s+(\d+)\*\*:?\s*([^*]+?)(?=\*\*Idea\s+\d+\*\*:|$)'
-            refined_matches = list(re.finditer(refined_pattern, ideas[0], re.DOTALL))
-            if len(refined_matches) > 1:
-                ideas = []
-                for match in refined_matches:
-                    idea_num = match.group(1)
-                    idea_text = match.group(2).strip()
-                    if idea_text:
-                        ideas.append(f"**Idea {idea_num}**: {idea_text}")
-                print(f"✅ 重新提取后得到 {len(ideas)} 个Idea")
+        elif len(ideas) == 1 and 'Idea' in ideas[0]:
+            # 如果只有一个idea但可能包含多个idea标记，尝试进一步分割
+            # 检查是否包含多个Idea标记
+            original_text = ideas[0]  # 保存原始文本
+            idea_markers = list(re.finditer(r'\*\*Idea\s+(\d+)\*\*[：:]?', original_text, re.IGNORECASE))
+            if len(idea_markers) > 1:
+                print(f"⚠️  检测到单个文本包含多个Idea标记，尝试进一步分割...")
+                # 使用更精确的模式重新提取，支持中文冒号
+                refined_pattern = r'\*\*Idea\s+(\d+)\*\*[：:]?\s*([^*]+?)(?=\*\*Idea\s+\d+\*\*[：:]|$)'
+                refined_matches = list(re.finditer(refined_pattern, original_text, re.DOTALL))
+                if len(refined_matches) > 1:
+                    ideas = []
+                    for match in refined_matches:
+                        idea_num = match.group(1)
+                        idea_text = match.group(2).strip()
+                        if idea_text:
+                            # 保留完整的idea内容（包括详细描述）
+                            ideas.append(f"**Idea {idea_num}**: {idea_text}")
+                    print(f"✅ 重新提取后得到 {len(ideas)} 个Idea")
+                else:
+                    # 如果正则匹配失败，使用位置分割
+                    ideas = []
+                    for i, marker in enumerate(idea_markers):
+                        start = marker.start()
+                        end = idea_markers[i + 1].start() if i + 1 < len(idea_markers) else len(original_text)
+                        idea_text = original_text[start:end].strip()
+                        if idea_text:
+                            ideas.append(idea_text)
+                    print(f"✅ 使用位置分割得到 {len(ideas)} 个Idea")
         
         return ideas
 
@@ -584,7 +599,7 @@ class IdeaGenerator:
         return best_idea, best_idea_item["score"]
 
     def clean_research_plan(self, research_plan: str) -> str:
-        """清理研究计划中的无关语言"""
+        """清理研究计划中的无关语言和内容"""
         if not research_plan or not isinstance(research_plan, str):
             return research_plan
         
@@ -602,11 +617,15 @@ class IdeaGenerator:
             r'.*最终结果.*\n?',
             r'.*🎉.*\n?',
             r'.*⏱️.*总耗时.*\n?',
+            # 移除文件名（如 refined_idea_zh.md, idea.md 等）
+            r'^[^\n]*\.(md|txt|doc|docx)[^\n]*\n?',
+            r'^[^\n]*refined_idea[^\n]*\n?',
+            r'^[^\n]*idea[^\n]*\.(md|txt)[^\n]*\n?',
         ]
         
         cleaned = research_plan
         
-        # 移除开头的无关语言
+        # 移除开头的无关语言和文件名
         for pattern in patterns_to_remove:
             cleaned = re.sub(pattern, '', cleaned, flags=re.IGNORECASE | re.MULTILINE)
         
@@ -615,12 +634,13 @@ class IdeaGenerator:
         
         # 如果清理后文本以"Research Background"、"1. Research Background"等开头，保留
         # 否则，尝试找到第一个实际的章节标题
-        if not re.match(r'^(Research Background|1\.|#|##)', cleaned, re.IGNORECASE):
+        if not re.match(r'^(Research Background|1\.|#|##|一、|二、|三、)', cleaned, re.IGNORECASE):
             # 查找第一个章节标题
             section_patterns = [
-                r'(Research Background|Limitations of Current Work|Proposed Research Plan)',
+                r'(Research Background|Limitations of Current Work|Proposed Research Plan|研究背景|现有研究局限性|研究方案)',
                 r'(\d+\.\s*[A-Z][^.]*:)',
                 r'(#[#]?\s+[A-Z][^.]*)',
+                r'(一、|二、|三、|四、|五、)',
             ]
             
             for pattern in section_patterns:
@@ -683,7 +703,7 @@ class IdeaGenerator:
                 title = "Research Proposal" if self.language == 'en' else "研究计划"
             
             try:
-                research_plan = future_plan.result(timeout=120)
+                research_plan = future_plan.result(timeout=140)
             except Exception as e:
                 print(f"⚠️  初步研究计划生成失败: {e}")
                 raise

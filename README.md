@@ -1,11 +1,12 @@
 # ICAIS2025-Ideation: 混合Idea生成系统
 
-结合SciPIP和keyu-ideation优点的新idea生成方案，通过Semantic Scholar API检索论文，生成创新研究想法和完整研究计划。
+结合SciPIP和keyu-ideation优点的新idea生成方案，通过Semantic Scholar API和OpenAlex API检索论文，生成创新研究想法和完整研究计划。系统优先使用Semantic Scholar API，失败时自动切换到OpenAlex，确保检索的稳定性和效率。
 
 ## 核心特性
 
-- ✅ **完全基于Semantic Scholar API**：无需维护本地数据库，实时检索最新论文
+- ✅ **智能论文检索**：优先使用Semantic Scholar API，失败时自动fallback到OpenAlex
 - ✅ **混合检索策略**：多维度检索（最新、高引用、相关）+ 语义重排序
+- ✅ **自动故障切换**：检测到429错误或检索失败时，立即切换到OpenAlex，避免长时间等待
 - ✅ **深度论文分析**：逐篇生成Inspiration + 全局综合Inspiration
 - ✅ **Brainstorm默认开启**：确保创新性
 - ✅ **研究计划审查默认开启**：确保质量
@@ -23,11 +24,17 @@ ICAIS2025-Ideation/
 ├── config.py                  # 配置管理（支持环境变量延迟加载）
 ├── llm_client.py              # LLM客户端（支持自定义API端点）
 ├── embedding_client.py        # Embedding客户端（API调用）
-├── retriever.py               # 论文检索器（Semantic Scholar API）
+├── retriever.py               # 论文检索器（Semantic Scholar API + OpenAlex fallback）
 ├── idea_generator.py          # Idea生成器（包含所有生成、优化、评估功能）
 ├── prompt_template.py         # Prompt模板（支持中英文）
 ├── requirements.txt           # Python依赖
-├── problem_fix_record.md      # 问题修复记录
+├── Dockerfile                 # Docker镜像构建文件
+├── docker-compose.yml         # Docker Compose配置文件
+├── openalex_search_test.py    # OpenAlex API测试文件
+├── issues_record/             # 问题记录和文档
+│   ├── OpenAlex_Usage.md      # OpenAlex使用说明
+│   ├── problem_fix_record.md  # 问题修复记录
+│   └── ...                    # 其他文档
 └── README.md                  # 本文件
 ```
 
@@ -52,10 +59,15 @@ SCI_LLM_MODEL=deepseek-ai/DeepSeek-V3
 # LLM_API_KEY=your-api-key
 # LLM_MODEL=deepseek-ai/DeepSeek-V3
 
-# Embedding模型配置
-SCI_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-4B
-# 或使用旧变量名
-# EMBEDDING_MODEL_NAME=Qwen/Qwen3-Embedding-4B
+# Embedding模型配置（默认：jinaai/jina-embeddings-v3）
+SCI_EMBEDDING_MODEL=jinaai/jina-embeddings-v3
+# 或使用其他模型，例如：
+# SCI_EMBEDDING_MODEL=Qwen/Qwen3-Embedding-4B
+
+# Embedding API配置（必需，用于语义重排序）
+# 注意：如果未配置，系统将跳过语义重排序功能，但仍可正常运行
+SCI_EMBEDDING_BASE_URL=http://your-embedding-api-endpoint/v1
+SCI_EMBEDDING_API_KEY=your-embedding-api-key
 
 # 应用配置
 APP_ENV=dev
@@ -219,15 +231,265 @@ FastAPI自动生成的交互式API文档，访问 `http://localhost:3000/docs` �
 3. **并发限制**：建议根据服务器资源限制并发请求数量
 4. **端口配置**：默认端口3000，可在`api_service.py`中修改
 
+## 容器化部署
+
+系统支持使用 Docker 和 Docker Compose 进行容器化部署。
+
+### 前置要求
+
+1. **Docker 和 Docker Compose**：确保已安装并运行
+   - 如果使用 colima，确保 colima 已启动：`colima start`
+   - 如果使用 Docker Desktop，确保 Docker Desktop 正在运行
+
+2. **基础镜像**：已通过 colima 拉取华为云镜像
+   ```bash
+   docker pull swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.12-slim-bookworm
+   ```
+
+3. **创建标签**：通过docker tag将华为云 SWR 的镜像重新打标签为 Docker Hub 官方格式
+   ```bash
+   docker tag swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/python:3.12-slim-bookworm python:3.12-slim-bookworm
+   ```
+
+### 部署步骤
+
+#### 1. 配置环境变量
+
+确保已创建 `.env` 文件并配置了必要的环境变量（参考上方"配置"章节）。
+
+#### 2. 构建 Docker 镜像
+
+```bash
+docker-compose build
+```
+
+**说明**：
+- Dockerfile 已配置使用华为云镜像：`python:3.12-slim-bookworm`
+- 构建过程会自动安装 Python 依赖（使用清华镜像源加速）
+
+#### 3. 启动服务
+
+```bash
+docker-compose up -d
+```
+
+**说明**：
+- `-d` 参数表示后台运行
+- 服务将在端口 3000 上启动（可通过 `HOST_PORT` 环境变量修改）
+
+#### 4. 查看服务状态
+
+```bash
+# 查看容器状态
+docker-compose ps
+
+# 查看日志
+docker-compose logs -f
+
+# 查看最近 100 行日志
+docker-compose logs --tail=100
+```
+
+#### 5. 验证服务
+
+**健康检查**：
+```bash
+curl http://localhost:3000/health
+```
+
+预期响应：
+```json
+{
+  "status": "ok",
+  "service": "ICAIS2025-Ideation API"
+}
+```
+
+**查看 API 文档**：
+访问：http://localhost:3000/docs
+
+**测试 API 端点**：
+```bash
+curl -X POST http://localhost:3000/ideation \
+  -H "Content-Type: application/json" \
+  -d '{"query": "我想做一个遥感图像场景分类的研究。"}' \
+  --no-buffer
+```
+
+### 常用操作
+
+#### 停止服务
+```bash
+docker-compose down
+```
+
+#### 重启服务
+```bash
+docker-compose restart
+```
+
+#### 重新构建并启动
+```bash
+docker-compose up -d --build
+```
+
+#### 查看实时日志
+```bash
+docker-compose logs -f app
+```
+
+#### 进入容器
+```bash
+docker-compose exec app /bin/bash
+```
+
+#### 清理资源
+```bash
+# 停止并删除容器
+docker-compose down
+
+# 停止并删除容器、网络、卷
+docker-compose down -v
+
+# 删除镜像（谨慎使用）
+docker rmi icais2025-ideation:latest
+```
+
+### 容器配置说明
+
+#### 端口配置
+
+默认端口映射：`3000:3000`（主机端口:容器端口）
+
+可通过环境变量修改：
+```bash
+# 在 .env 文件中设置
+HOST_PORT=8080
+```
+
+或在 `docker-compose.yml` 中直接修改：
+```yaml
+ports:
+  - "8080:3000"  # 主机端口:容器端口
+```
+
+#### 环境变量
+
+所有配置通过 `.env` 文件管理，支持的环境变量请参考上方"配置"章节。
+
+**重要环境变量**：
+- `SCI_MODEL_BASE_URL`：LLM API 端点（必需）
+- `SCI_MODEL_API_KEY`：LLM API 密钥（必需）
+- `SCI_LLM_MODEL`：LLM 模型名称
+- `SCI_EMBEDDING_MODEL`：Embedding 模型名称
+- `HOST_PORT`：主机端口（默认：3000）
+
+#### 资源限制
+
+如需限制容器资源使用，可在 `docker-compose.yml` 中添加：
+
+```yaml
+services:
+  app:
+    # ... 其他配置
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+```
+
+### 故障排除
+
+#### 1. 容器无法启动
+
+**检查日志**：
+```bash
+docker-compose logs app
+```
+
+**常见原因**：
+- 环境变量未正确配置
+- 端口被占用
+- 镜像构建失败
+
+#### 2. API 请求失败
+
+**检查服务状态**：
+```bash
+docker-compose ps
+curl http://localhost:3000/health
+```
+
+**检查配置**：
+- 确认 `.env` 文件中的 LLM API 配置正确
+- 确认网络连接正常
+
+#### 3. 镜像拉取失败
+
+如果基础镜像拉取失败，确保：
+- colima 已启动：`colima status`
+- 镜像已正确拉取：`docker images | grep python`
+
+#### 4. 构建失败
+
+**清理并重新构建**：
+```bash
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+```
+
+#### 5. 查看详细错误信息
+
+```bash
+# 查看容器日志
+docker-compose logs --tail=200 app
+
+# 进入容器调试
+docker-compose exec app /bin/bash
+```
+
+### 更新服务
+
+当代码更新后，重新部署：
+
+```bash
+# 1. 停止服务
+docker-compose down
+
+# 2. 重新构建镜像
+docker-compose build
+
+# 3. 启动服务
+docker-compose up -d
+
+# 4. 查看日志确认启动成功
+docker-compose logs -f
+```
+
+### 生产环境建议
+
+1. **使用环境变量管理敏感信息**：不要将 `.env` 文件提交到版本控制系统
+2. **配置资源限制**：根据实际需求限制容器的 CPU 和内存使用
+3. **配置日志轮转**：避免日志文件过大
+4. **使用反向代理**：使用 Nginx 或 Traefik 作为反向代理
+5. **配置健康检查**：定期检查服务健康状态
+6. **监控和告警**：配置监控系统监控服务状态
+
 ## 完整流程
 
 系统执行以下9个步骤：
 
-1. **提取关键词**：从用户查询中提取关键词（用于论文检索）
+1. **提取关键词**：从用户查询中提取关键词（最多4个，用于论文检索）
 2. **扩展背景**：将简短查询扩展为详细研究背景
 3. **混合检索论文**：
    - 并行检索最新、高引用、相关论文（3类）
-   - 使用Semantic Scholar API
+   - 优先使用Semantic Scholar API
+   - 失败时自动fallback到OpenAlex（特别是429错误时立即切换）
    - 语义重排序（基于embedding相似度）
    - 去重和融合
 4. **Brainstorm生成**：生成创新想法（默认开启）
@@ -296,19 +558,32 @@ FastAPI自动生成的交互式API文档，访问 `http://localhost:3000/docs` �
 
 - **API框架**：FastAPI（用于API服务）
 - **流式输出**：SSE (Server-Sent Events)
-- **论文检索**：Semantic Scholar API
+- **论文检索**：Semantic Scholar API（主要）+ OpenAlex API（fallback）
 - **LLM服务**：支持自定义API端点（兼容OpenAI格式）
-- **Embedding模型**：支持API调用（默认：Qwen/Qwen3-Embedding-4B）
+- **Embedding模型**：支持API调用（默认：jinaai/jina-embeddings-v3），支持独立的API配置
 - **并行处理**：ThreadPoolExecutor
 - **语言支持**：自动检测中英文，支持双语输出
 
 ## 关键设计
 
 ### 1. 混合检索策略
+
+#### 主要检索源：Semantic Scholar API
 - **最新论文**：按发表时间排序
 - **高引用论文**：按引用数排序
 - **相关论文**：按相关性排序
-- **语义重排序**：基于embedding相似度重新排序
+
+#### Fallback检索源：OpenAlex API
+当Semantic Scholar API失败时（特别是429错误），系统会自动切换到OpenAlex：
+- **快速切换**：检测到429错误时立即切换，不进行重试
+- **减少重试**：将Semantic Scholar的重试次数从20次减少到2次，快速fallback
+- **格式统一**：OpenAlex的结果自动转换为与Semantic Scholar兼容的格式
+- **无缝切换**：对上层代码透明，无需修改其他逻辑
+
+#### 语义重排序
+- 基于embedding相似度重新排序所有检索到的论文
+- 确保最相关的论文排在前面
+- **注意**：如果未配置Embedding API（SCI_EMBEDDING_BASE_URL和SCI_EMBEDDING_API_KEY），系统将跳过语义重排序，论文将按原始检索顺序返回
 
 ### 2. 迭代优化机制
 - **批判性审查**：识别Idea的弱点（重叠度、新颖性、可行性等）
@@ -333,17 +608,26 @@ FastAPI自动生成的交互式API文档，访问 `http://localhost:3000/docs` �
 
 ### 可选配置
 - `SCI_LLM_MODEL` 或 `LLM_MODEL`：LLM模型名称（默认：deepseek-ai/DeepSeek-V3）
+- `SCI_LLM_REASONING_MODEL`：推理模型名称（用于深度推理任务，必需）
 - `SCI_EMBEDDING_MODEL` 或 `EMBEDDING_MODEL_NAME`：Embedding模型名称（默认：jinaai/jina-embeddings-v3）
+- `SCI_EMBEDDING_BASE_URL`：Embedding API端点（可选，未设置时将跳过语义重排序功能）
+- `SCI_EMBEDDING_API_KEY`：Embedding API密钥（可选，未设置时将跳过语义重排序功能）
 - 其他配置见上方配置示例
+
+**注意**：
+- Embedding配置用于语义重排序功能。如果未设置，系统将跳过语义重排序，但仍可正常运行（论文将按原始顺序返回）
+- OpenAlex API无需配置，系统会自动使用（无需API密钥）
 
 ## 故障排除
 
 ### 常见问题
 
-1. **Semantic Scholar API超时**
-   - 已实现指数退避重试机制
+1. **Semantic Scholar API超时或429错误**
+   - 已实现指数退避重试机制（最多重试2次）
+   - 检测到429错误时立即切换到OpenAlex，避免长时间等待
    - 超时时间已优化为30秒
    - 使用HTTP协议减少连接时间
+   - **自动fallback**：所有失败情况都会自动切换到OpenAlex进行检索
 
 2. **Idea优化失败**
    - 已实现容错机制，失败时使用原始Idea
@@ -357,15 +641,25 @@ FastAPI自动生成的交互式API文档，访问 `http://localhost:3000/docs` �
 
 ## 注意事项
 
-1. **API限流**：代码中已添加延迟和重试机制，避免过快请求
-2. **网络连接**：确保可以访问Semantic Scholar API和LLM API端点
-3. **环境变量**：必须正确配置LLM API端点和密钥
+1. **API限流**：
+   - Semantic Scholar API：已实现快速fallback机制，检测到429错误时立即切换到OpenAlex
+   - 代码中已添加延迟和重试机制，避免过快请求
+   - OpenAlex API：无需API密钥，但建议合理控制请求频率
+2. **网络连接**：确保可以访问Semantic Scholar API、OpenAlex API和LLM API端点
+3. **环境变量**：
+   - 必须正确配置LLM API端点和密钥
+   - Embedding API配置可选，未设置时将跳过语义重排序功能
 4. **超时设置**：如果网络较慢，可以适当增加超时时间
 5. **并行数量**：根据API服务能力调整并行数量，避免过载
+6. **检索源切换**：系统会自动在Semantic Scholar和OpenAlex之间切换，无需手动干预
 
 ## 更新日志
 
 ### 最新优化（2024）
+- ✅ **OpenAlex Fallback机制**：Semantic Scholar失败时自动切换到OpenAlex，避免长时间等待
+- ✅ **快速故障切换**：检测到429错误时立即切换，减少重试次数（20→2次）
+- ✅ **Embedding独立配置**：支持独立的Embedding API配置（SCI_EMBEDDING_BASE_URL、SCI_EMBEDDING_API_KEY）
+- ✅ **关键词提取优化**：支持提取最多4个关键词，提高检索准确性
 - ✅ 步骤6 Idea生成并行化
 - ✅ 步骤8 Idea评估并行化
 - ✅ 步骤9 标题和初步计划并行生成

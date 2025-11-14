@@ -66,6 +66,22 @@ class Config(metaclass=ConfigMeta):
         # Embedding配置（适配新的环境变量名称）
         elif name == "EMBEDDING_MODEL_NAME":
             return cls._get_env_with_fallback("SCI_EMBEDDING_MODEL", "EMBEDDING_MODEL_NAME", "jinaai/jina-embeddings-v3")
+        elif name == "EMBEDDING_API_ENDPOINT":
+            # 优先使用embedding专用配置，如果没有则fallback到LLM配置（向后兼容）
+            embedding_url = cls._get_env("SCI_EMBEDDING_BASE_URL")
+            # if embedding_url:
+            #     return embedding_url
+            # # Fallback到LLM配置
+            # return cls._get_env_with_fallback("SCI_MODEL_BASE_URL", "LLM_API_ENDPOINT")
+            return embedding_url
+        elif name == "EMBEDDING_API_KEY":
+            # 优先使用embedding专用配置，如果没有则fallback到LLM配置（向后兼容）
+            embedding_key = cls._get_env("SCI_EMBEDDING_API_KEY")
+            # if embedding_key:
+            #     return embedding_key
+            # # Fallback到LLM配置
+            # return cls._get_env_with_fallback("SCI_MODEL_API_KEY", "LLM_API_KEY")
+            return embedding_key
         elif name == "EMBEDDING_DEVICE":
             return cls._get_env("EMBEDDING_DEVICE", "cpu")
         

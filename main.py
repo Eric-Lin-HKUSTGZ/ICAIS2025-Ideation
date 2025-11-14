@@ -53,7 +53,7 @@ def main():
         return
     
     # 用户查询
-    user_query = "我想做一个大模型压缩加速的研究。"
+    user_query = "Light-weight model backbone design for remote sensing image scene classification and detection."
     # user_query = "I want to do a research on remote sensing image scene classification."
     print(f"\n📝 用户查询: {user_query}")
     

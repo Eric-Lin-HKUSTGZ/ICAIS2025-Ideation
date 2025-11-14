@@ -25,16 +25,16 @@ class EmbeddingClient:
         """
         self.config = Config
         
-        # 优先从环境变量读取配置
-        self.base_url = base_url or self.config.LLM_API_ENDPOINT
-        self.api_key = api_key or self.config.LLM_API_KEY
+        # 优先从参数读取配置，其次从embedding专用配置读取，最后fallback到LLM配置
+        self.base_url = base_url or self.config.EMBEDDING_API_ENDPOINT
+        self.api_key = api_key or self.config.EMBEDDING_API_KEY
         self.model = model or self.config.EMBEDDING_MODEL_NAME
         
         if not self.api_key:
-            raise ValueError("API密钥未找到，请设置 SCI_MODEL_API_KEY 环境变量")
+            raise ValueError("API密钥未找到，请设置 SCI_EMBEDDING_API_KEY 环境变量（或使用 SCI_MODEL_API_KEY 作为fallback）")
         
         if not self.base_url:
-            raise ValueError("API端点未找到，请设置 SCI_MODEL_BASE_URL 环境变量")
+            raise ValueError("API端点未找到，请设置 SCI_EMBEDDING_BASE_URL 环境变量（或使用 SCI_MODEL_BASE_URL 作为fallback）")
         
         # 确保base_url以/v1结尾（OpenAI客户端会自动添加/embeddings）
         if not self.base_url.endswith("/v1"):

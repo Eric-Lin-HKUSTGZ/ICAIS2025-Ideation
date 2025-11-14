@@ -1,6 +1,6 @@
 PROMPT_TEMPLATES = {
     "retrieve_query": """You are an expert at extracting keywords from user queries. 
-Below, I will provide you with a user query in which the user expresses interest in developing a new research proposal. Your task is to extract up to two keywords that best capture the core research topic or methodology of interest to the user.
+Below, I will provide you with a user query in which the user expresses interest in developing a new research proposal. Your task is to extract up to four keywords that best capture the core research topic or methodology of interest to the user.
 
 Each keyword must be:
 
@@ -11,7 +11,7 @@ Each keyword must be:
 Here is the user query:
 User Query: {user_query}
 
-Please output exactly one or two keywords—no more, no less—each as a lowercase English noun, separated by a comma and without any additional text, punctuation, or formatting.
+Please output one to four keywords (1-4 keywords)—no more, no less—each as a lowercase English noun, separated by a comma and without any additional text, punctuation, or formatting.
 """,
     
     "expand_background": """You are an expert at expanding brief research queries into detailed research backgrounds.
@@ -162,6 +162,12 @@ Please ensure that your final ideas include exactly 3 entries and present the in
 **Idea 1**: [The first method idea]
 **Idea 2**: [The second method idea]
 **Idea 3**: [The third method idea]
+
+CRITICAL FORMAT REQUIREMENTS:
+- Each idea should be a concise title or brief description (1-2 sentences maximum)
+- Do NOT include detailed subsections like "核心理念" (Core Concept), "针对性" (Targeted Application), etc.
+- Each idea should be separated clearly, with each **Idea X**: on a new line or clearly separated
+- Keep the format simple and consistent: **Idea 1**: [brief description], **Idea 2**: [brief description], **Idea 3**: [brief description]
 """,
     
     "critic_idea": """You are a rigorous research idea reviewer.
@@ -243,21 +249,35 @@ CRITICAL REQUIREMENT - BEST IDEA ALIGNMENT:
 - The Best Idea is the core of the research proposal - all sections must support and elaborate on this specific idea
 - If the Best Idea mentions specific techniques, methods, or frameworks, the proposal must detail how these will be implemented
 
+CRITICAL REQUIREMENT - PAPER CITATION FORMAT:
+- When referencing papers in the proposal body, use numbered citations in square brackets (e.g., [1], [2], [3])
+- Citation numbers MUST be assigned sequentially starting from [1] based on the order papers are FIRST mentioned in the proposal body
+- Citation numbers MUST be continuous (1, 2, 3, 4, 5...), with NO gaps or skipped numbers
+- DO NOT use generic references like "论文1" (Paper 1), "论文2" (Paper 2), or "论文X" (Paper X) in the body text
+- At the end of the proposal, include a "References" section (or "参考文献" in Chinese) that lists all cited papers with their full titles
+- Format references as: [1] [Full Paper Title], [2] [Full Paper Title], [3] [Full Paper Title], etc.
+- References MUST be numbered sequentially from [1] to [N] with NO gaps, matching the citation numbers used in the body text
+- Only include papers that are actually cited in the proposal body
+
 Based on this information, please draft a complete research proposal that fulfills the following requirements:
 
 1. The proposal must be grounded in the provided research inspiration and best idea—do not deviate from or replace them.
 2. The proposal MUST strictly follow and elaborate on the Best Idea provided above.
 3. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
-4. If no specific structure is given, organize the proposal into the following three sections:
-   • Research Background – contextualize the problem and summarize key findings from the related literature,
-   • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches, and
-   • Proposed Research Plan – detail the novel idea (the Best Idea), methodology, and how it addresses the user's query and overcomes prior limitations.
+4. If no specific structure is given, organize the proposal into the following sections:
+   • Research Background – contextualize the problem and summarize key findings from the related literature (use numbered citations [1], [2], etc.),
+   • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches (use numbered citations [1], [2], etc.),
+   • Proposed Research Plan – detail the novel idea (the Best Idea), methodology, and how it addresses the user's query and overcomes prior limitations,
+   • References – list all cited papers with their full titles in the format: [1] [Full Paper Title], [2] [Full Paper Title], etc.
 
 IMPORTANT OUTPUT FORMAT REQUIREMENTS:
 - Output your response in Markdown format.
 - Start directly with the research proposal content. Do NOT include any introductory phrases such as "Of course", "Certainly", "I have thoroughly revised", "Based on", "According to", etc.
 - Do NOT include any meta-commentary about the writing process (e.g., "I have revised", "I will now", "Let me").
-- Output ONLY the research proposal content itself, beginning with the first section title.
+- Do NOT include any file names, metadata, or irrelevant content (e.g., "refined_idea_zh.md", file paths, etc.)
+- Output ONLY the research proposal content itself, beginning with the first section title (e.g., "# Research Title" or "# 研究标题").
+- Use numbered citations [1], [2], [3], etc. in the body text when referencing papers. Citations MUST be numbered sequentially from [1] with NO gaps.
+- Include a References section at the end with full paper titles, numbered sequentially from [1] to [N] with NO gaps.
 - Ensure the proposal is coherent, technically sound, and directly aligned with both the user's needs and the provided inspiration.
 """,
     
@@ -288,19 +308,34 @@ CRITICAL REQUIREMENT - BEST IDEA CONSISTENCY:
 - The revision should only improve clarity, address weaknesses, and enhance details while keeping the Best Idea intact
 - If the Best Idea mentions specific techniques, methods, or frameworks, these must remain in the revised proposal
 
+CRITICAL REQUIREMENT - PAPER CITATION FORMAT:
+- When referencing papers in the proposal body, use numbered citations in square brackets (e.g., [1], [2], [3])
+- Citation numbers MUST be assigned sequentially starting from [1] based on the order papers are FIRST mentioned in the proposal body
+- Citation numbers MUST be continuous (1, 2, 3, 4, 5...), with NO gaps or skipped numbers
+- DO NOT use generic references like "论文1" (Paper 1), "论文2" (Paper 2), or "论文X" (Paper X) in the body text
+- At the end of the proposal, include a "References" section (or "参考文献" in Chinese) that lists all cited papers with their full titles
+- Format references as: [1] [Full Paper Title], [2] [Full Paper Title], [3] [Full Paper Title], etc.
+- References MUST be numbered sequentially from [1] to [N] with NO gaps, matching the citation numbers used in the body text
+- Only include papers that are actually cited in the proposal body
+- If the preliminary proposal already has a References section, renumber it to ensure continuous numbering from [1] to [N] with NO gaps
+
 Please revise the research proposal thoroughly in light of the feedback, ensuring that the updated version fully aligns with both the original user query and the stated revision requirements. The revised proposal should clearly address the identified issues—such as lack of novelty, insufficient methodological detail, or misalignment with the user's goals—while maintaining coherence, rigor, and scientific plausibility. The refined proposal should fulfills the following requirements:
 1. The proposal MUST remain consistent with the Best Idea used in the preliminary proposal.
 2. If the user specifies particular sections or components the proposal should include, follow those instructions exactly.
-3. If no specific structure is given, organize the proposal into the following three sections:
-   • Research Background – contextualize the problem and summarize key findings from the related literature,
-   • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches, and
-   • Proposed Research Plan – detail the novel idea, methodology, and how it addresses the user's query and overcomes prior limitations.
+3. If no specific structure is given, organize the proposal into the following sections:
+   • Research Background – contextualize the problem and summarize key findings from the related literature (use numbered citations [1], [2], etc.),
+   • Limitations of Current Work – identify critical gaps or shortcomings in existing approaches (use numbered citations [1], [2], etc.),
+   • Proposed Research Plan – detail the novel idea, methodology, and how it addresses the user's query and overcomes prior limitations,
+   • References – list all cited papers with their full titles in the format: [1] [Full Paper Title], [2] [Full Paper Title], etc.
 
 IMPORTANT OUTPUT FORMAT REQUIREMENTS:
 - Output your response in Markdown format.
 - Start directly with the revised research proposal content. Do NOT include any introductory phrases such as "Of course", "Certainly", "I have thoroughly revised", "I have revised", "Based on", "According to", etc.
 - Do NOT include any meta-commentary about the revision process (e.g., "I have revised", "I will now", "Let me", "I have addressed").
-- Output ONLY the revised research proposal content itself, beginning with the first section title.
+- Do NOT include any file names, metadata, or irrelevant content (e.g., "refined_idea_zh.md", file paths, etc.)
+- Output ONLY the revised research proposal content itself, beginning with the first section title (e.g., "# Research Title" or "# 研究标题").
+- Use numbered citations [1], [2], [3], etc. in the body text when referencing papers. Citations MUST be numbered sequentially from [1] with NO gaps.
+- Include a References section at the end with full paper titles, numbered sequentially from [1] to [N] with NO gaps.
 - Do NOT explain what you changed or how you revised the proposal. Simply output the improved proposal.
 """,
     
