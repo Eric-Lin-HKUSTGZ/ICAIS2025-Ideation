@@ -32,7 +32,7 @@ class Config(metaclass=ConfigMeta):
         elif name == "LLM_API_KEY":
             return cls._get_env_with_fallback("SCI_MODEL_API_KEY", "LLM_API_KEY")
         elif name == "LLM_MODEL":
-            return cls._get_env_with_fallback("SCI_LLM_MODEL", "LLM_MODEL", "deepseek-ai/DeepSeek-V3")
+            return cls._get_env_with_fallback("SCI_LLM_MODEL", "LLM_MODEL", "xxx")
         elif name == "LLM_REASONING_MODEL":
             reasoning_model = cls._get_env("SCI_LLM_REASONING_MODEL")
             if not reasoning_model:
@@ -65,7 +65,7 @@ class Config(metaclass=ConfigMeta):
         
         # Embedding配置（适配新的环境变量名称）
         elif name == "EMBEDDING_MODEL_NAME":
-            return cls._get_env_with_fallback("SCI_EMBEDDING_MODEL", "EMBEDDING_MODEL_NAME", "jinaai/jina-embeddings-v3")
+            return cls._get_env_with_fallback("SCI_EMBEDDING_MODEL", "EMBEDDING_MODEL_NAME", "xxx")
         elif name == "EMBEDDING_API_ENDPOINT":
             # 优先使用embedding专用配置，如果没有则fallback到LLM配置（向后兼容）
             embedding_url = cls._get_env("SCI_EMBEDDING_BASE_URL")
