@@ -90,169 +90,165 @@ class IdeationRequest(BaseModel):
     query: str
 
 
-def format_sse_data(data: dict) -> str:
-    """生成SSE格式的数据"""
+def format_sse_data(content: str) -> str:
+    """生成OpenAI格式的SSE数据"""
+    data = {
+        "object": "chat.completion.chunk",
+        "choices": [{
+            "delta": {
+                "content": content
+            }
+        }]
+    }
     return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+def format_sse_done() -> str:
+    """生成SSE结束标记"""
+    return "data: [DONE]\n\n"
+
+def stream_message(message: str, chunk_size: int = 1):
+    """将消息按字符流式输出（同步生成器）"""
+    for i in range(0, len(message), chunk_size):
+        chunk = message[i:i + chunk_size]
+        yield format_sse_data(chunk)
 
 
 async def _generate_ideation_internal(query: str) -> AsyncGenerator[str, None]:
     """内部生成器函数，执行实际的生成逻辑"""
-    yield format_sse_data({
-        "type": "start",
-        "message": "# 开始生成研究Idea\n\n"
-    })
+    for chunk in stream_message("# 开始生成研究Idea\n\n"):
+        yield chunk
     
     # 验证配置
     try:
         config_valid = await asyncio.to_thread(Config.validate_config)
         if not config_valid:
-            yield format_sse_data({
-                "type": "error",
-                "message": "## 错误\n\n配置验证失败，请检查环境变量设置\n\n"
-            })
+            for chunk in stream_message("## 错误\n\n配置验证失败，请检查环境变量设置\n\n"):
+                yield chunk
             return
     except Exception as e:
-        yield format_sse_data({
-            "type": "error",
-            "message": f"## 错误\n\n配置验证异常: {e}\n\n"
-        })
+        for chunk in stream_message(f"## 错误\n\n配置验证异常: {e}\n\n"):
+            yield chunk
         return
     
     # 创建组件（使用更安全的创建方式）
     try:
         client = LLMClient()
-        yield format_sse_data({"type": "info", "message": "LLM客户端初始化成功\n\n"})
+        for chunk in stream_message("LLM客户端初始化成功\n\n"):
+            yield chunk
     except Exception as e:
-        yield format_sse_data({
-            "type": "error",
-            "message": f"## 错误\n\nLLM客户端初始化失败: {e}\n\n"
-        })
+        for chunk in stream_message(f"## 错误\n\nLLM客户端初始化失败: {e}\n\n"):
+            yield chunk
         return
     
     try:
         retriever = PaperRetriever()
-        yield format_sse_data({"type": "info", "message": "论文检索器初始化成功\n\n"})
+        for chunk in stream_message("论文检索器初始化成功\n\n"):
+            yield chunk
     except Exception as e:
-        yield format_sse_data({
-            "type": "error",
-            "message": f"## 错误\n\n论文检索器初始化失败: {e}\n\n"
-        })
+        for chunk in stream_message(f"## 错误\n\n论文检索器初始化失败: {e}\n\n"):
+            yield chunk
         return
     
     # 检测语言
     language = await asyncio.to_thread(IdeaGenerator.detect_language, query)
-    yield format_sse_data({
-        "type": "info",
-        "message": f"检测到语言: **{'中文' if language == 'zh' else 'English'}**\n\n"
-    })
+    for chunk in stream_message(f"检测到语言: **{'中文' if language == 'zh' else 'English'}**\n\n"):
+        yield chunk
     
     generator = IdeaGenerator(client, language=language)
     
     # 步骤1: 提取关键词
-    yield format_sse_data({"type": "step", "step": 1, "message": "## 步骤1: 提取关键词\n\n"})
+    for chunk in stream_message("## 步骤1: 提取关键词\n\n"):
+        yield chunk
     keywords = await asyncio.to_thread(generator.extract_keywords, query)
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 1,
-        "message": f"**提取到的关键词**: {', '.join(keywords)}\n\n"
-    })
+    for chunk in stream_message(f"**提取到的关键词**: {', '.join(keywords)}\n\n"):
+        yield chunk
     
     # 步骤2: 扩展背景
-    yield format_sse_data({"type": "step", "step": 2, "message": "## 步骤2: 扩展背景\n\n"})
+    for chunk in stream_message("## 步骤2: 扩展背景\n\n"):
+        yield chunk
     expanded_background = await asyncio.to_thread(generator.expand_background, query, keywords)
-    yield format_sse_data({"type": "step_result", "step": 2, "message": "背景扩展完成\n\n"})
+    for chunk in stream_message("背景扩展完成\n\n"):
+        yield chunk
     
     # 步骤3: 混合检索论文
-    yield format_sse_data({"type": "step", "step": 3, "message": "## 步骤3: 混合检索论文\n\n"})
+    for chunk in stream_message("## 步骤3: 混合检索论文\n\n"):
+        yield chunk
     papers = await asyncio.to_thread(retriever.hybrid_retrieve, expanded_background, keywords)
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 3,
-        "message": f"检索到 **{len(papers)}** 篇论文\n\n"
-    })
+    for chunk in stream_message(f"检索到 **{len(papers)}** 篇论文\n\n"):
+        yield chunk
     
     if not papers:
-        yield format_sse_data({
-            "type": "error",
-            "message": "## 错误\n\n未检索到相关论文，程序终止\n\n"
-        })
+        for chunk in stream_message("## 错误\n\n未检索到相关论文，程序终止\n\n"):
+            yield chunk
         return
     
     # 步骤4: Brainstorm
-    yield format_sse_data({"type": "step", "step": 4, "message": "## 步骤4: 生成Brainstorm\n\n"})
+    for chunk in stream_message("## 步骤4: 生成Brainstorm\n\n"):
+        yield chunk
     brainstorm = await asyncio.to_thread(generator.generate_brainstorm, expanded_background)
-    yield format_sse_data({"type": "step_result", "step": 4, "message": "Brainstorm生成完成\n\n"})
+    for chunk in stream_message("Brainstorm生成完成\n\n"):
+        yield chunk
     
     # 步骤5: 多源Inspiration
-    yield format_sse_data({"type": "step", "step": 5, "message": "## 步骤5: 生成多源Inspiration\n\n"})
+    for chunk in stream_message("## 步骤5: 生成多源Inspiration\n\n"):
+        yield chunk
     inspirations = await asyncio.to_thread(
         generator.generate_multi_inspirations,
         expanded_background, query, papers
     )
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 5,
-        "message": f"生成了 **{len(inspirations['paper_inspirations'])}** 个论文Inspiration和**1**个全局Inspiration\n\n"
-    })
+    for chunk in stream_message(f"生成了 **{len(inspirations['paper_inspirations'])}** 个论文Inspiration和**1**个全局Inspiration\n\n"):
+        yield chunk
     
     # 步骤6: 生成Idea
-    yield format_sse_data({"type": "step", "step": 6, "message": "## 步骤6: 生成多个Idea\n\n"})
+    for chunk in stream_message("## 步骤6: 生成多个Idea\n\n"):
+        yield chunk
     initial_ideas = await asyncio.to_thread(
         generator.generate_ideas,
         expanded_background, inspirations, brainstorm, query
     )
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 6,
-        "message": f"生成了 **{len(initial_ideas)}** 个Idea\n\n"
-    })
+    for chunk in stream_message(f"生成了 **{len(initial_ideas)}** 个Idea\n\n"):
+        yield chunk
     
     if not initial_ideas:
-        yield format_sse_data({
-            "type": "error",
-            "message": "## 错误\n\n未生成任何Idea，程序终止\n\n"
-        })
+        for chunk in stream_message("## 错误\n\n未生成任何Idea，程序终止\n\n"):
+            yield chunk
         return
     
     # 步骤7: 迭代优化
-    yield format_sse_data({"type": "step", "step": 7, "message": "## 步骤7: 迭代优化Idea\n\n"})
+    for chunk in stream_message("## 步骤7: 迭代优化Idea\n\n"):
+        yield chunk
     refined_ideas = await asyncio.to_thread(
         generator.iterative_refine_ideas,
         expanded_background, papers, initial_ideas
     )
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 7,
-        "message": f"优化了 **{len(refined_ideas)}** 个Idea\n\n"
-    })
+    for chunk in stream_message(f"优化了 **{len(refined_ideas)}** 个Idea\n\n"):
+        yield chunk
     
     # 步骤8: 评估筛选
-    yield format_sse_data({"type": "step", "step": 8, "message": "## 步骤8: 评估与筛选最优Idea\n\n"})
+    for chunk in stream_message("## 步骤8: 评估与筛选最优Idea\n\n"):
+        yield chunk
     best_idea, score = await asyncio.to_thread(
         generator.evaluate_and_select_best_idea,
         expanded_background, refined_ideas
     )
     
     best_idea_clean = best_idea.strip().replace('**', '')
-    yield format_sse_data({
-        "type": "step_result",
-        "step": 8,
-        "message": f"### 最优Idea\n\n{best_idea_clean}\n\n**得分**:\n- 可行性: {score['feasibility']:.2f}/5\n- 创新性: {score['novelty']:.2f}/5\n- 总分: {score['total']:.2f}/10\n\n"
-    })
+    for chunk in stream_message(f"### 最优Idea\n\n{best_idea_clean}\n\n**得分**:\n- 可行性: {score['feasibility']:.2f}/5\n- 创新性: {score['novelty']:.2f}/5\n- 总分: {score['total']:.2f}/10\n\n"):
+        yield chunk
     
     # 步骤9: 生成研究计划
-    yield format_sse_data({"type": "step", "step": 9, "message": "## 步骤9: 生成研究计划\n\n"})
+    for chunk in stream_message("## 步骤9: 生成研究计划\n\n"):
+        yield chunk
     research_plan = await asyncio.to_thread(
         generator.generate_research_plan,
         query, papers, best_idea, inspirations["global_inspiration"]
     )
-    yield format_sse_data({"type": "step_result", "step": 9, "message": "研究计划生成完成\n\n"})
+    for chunk in stream_message("研究计划生成完成\n\n"):
+        yield chunk
     
     # 最终结果
-    yield format_sse_data({
-        "type": "final",
-        "message": f"{research_plan}\n\n"
-    })
+    for chunk in stream_message(f"{research_plan}\n\n"):
+        yield chunk
 
 
 async def generate_ideation_stream(query: str) -> AsyncGenerator[str, None]:
@@ -265,21 +261,22 @@ async def generate_ideation_stream(query: str) -> AsyncGenerator[str, None]:
             # 检查是否超时
             elapsed = time.time() - start_time
             if elapsed > REQUEST_TIMEOUT:
-                yield format_sse_data({
-                    "type": "error",
-                    "message": f"## 超时错误\n\n请求处理超过 {REQUEST_TIMEOUT} 秒，已自动终止\n\n"
-                })
+                for chunk in stream_message(f"## 超时错误\n\n请求处理超过 {REQUEST_TIMEOUT} 秒，已自动终止\n\n"):
+                    yield chunk
+                yield format_sse_done()
                 return
             yield item
+        
+        # 发送结束标记
+        yield format_sse_done()
                 
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
         print(f"❌ 生成器错误: {e}\n{error_trace}")
-        yield format_sse_data({
-            "type": "error",
-            "message": f"## 错误\n\n程序执行失败: {e}\n\n```\n{error_trace}\n```\n\n"
-        })
+        for chunk in stream_message(f"## 错误\n\n程序执行失败: {e}\n\n```\n{error_trace}\n```\n\n"):
+            yield chunk
+        yield format_sse_done()
 
 
 @app.post("/ideation")

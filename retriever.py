@@ -76,7 +76,7 @@ class PaperRetriever:
         url = "https://api.openalex.org/works"
         
         # 清理查询字符串：移除引号和竖线，保留连字符和其他字符
-        # 将 "keyword1" | "keyword2" | "keyword3" 转换为 keyword1 keyword2 keyword3
+        # 将 "keyword1" | "keyword2" | "keyword3"  | "keyword4"转换为 keyword1 keyword2 keyword3 keyword4
         cleaned_query = query.replace('"', '').replace(' | ', ' ').strip()
         # 清理多余的空格
         import re
